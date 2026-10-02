@@ -1,10 +1,23 @@
-from django.urls import path
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from .views import LoginView
+from .views import (
+    LoginView,
+    RecintoViewSet,
+    EventoViewSet,
+    SectorViewSet,
+    CarroTicketsViewSet,
+)
 
 
-# Rutas de inicio de sesión y renovación del token de acceso.
+# El router genera automáticamente las rutas del catálogo.
+router = DefaultRouter()
+router.register("recintos", RecintoViewSet, basename="recinto")
+router.register("eventos", EventoViewSet, basename="evento")
+router.register("sectores", SectorViewSet, basename="sector")
+router.register("carro-tickets", CarroTicketsViewSet, basename="carro-tickets")
+
 urlpatterns = [
     path("token/", LoginView.as_view(), name="token_obtain_pair"),
     path(
@@ -12,4 +25,5 @@ urlpatterns = [
         TokenRefreshView.as_view(),
         name="token_refresh",
     ),
+    path("", include(router.urls)),
 ]
