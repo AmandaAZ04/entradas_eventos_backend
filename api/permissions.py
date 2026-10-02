@@ -35,3 +35,11 @@ class EsEspectador(BasePermission):
             request.user.is_authenticated
             and request.user.rol == Usuario.Rol.ESPECTADOR
         )
+
+# Permite gestionar ventas únicamente a los organizadores.
+class EsOrganizador(BasePermission):
+    def has_permission(self, request, view):
+        return (
+            request.user.is_authenticated
+            and request.user.rol == Usuario.Rol.ORGANIZADOR
+        )

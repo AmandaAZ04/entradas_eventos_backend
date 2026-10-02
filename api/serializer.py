@@ -2,6 +2,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
 from .models import Recinto, Evento, Sector
 from .models import ItemCarro
+from .models import Compra, DetalleCompra, Entrada
 
 # Incluye el nombre de usuario y su rol en ambos tokens.
 class LoginSerializer(TokenObtainPairSerializer):
@@ -107,3 +108,62 @@ class ItemCarroSerializer(serializers.ModelSerializer):
             "precio_unitario",
         ]
         read_only_fields = ["id"]
+
+# Información de cada ticket emitido.
+class EntradaSerializer(serializers.ModelSerializer):
+    evento = serializers.CharField(
+        source="detalle.sector.evento.nombre",
+        read_only=True,
+    )
+    sector = serializers.CharField(
+        source="detalle.sector.nombre",
+        read_only=True,
+    )
+
+    class Meta:
+        model = Entrada
+        fields = [
+            "id",
+            "codigo",
+            "evento",
+            "sector",
+            "valida",
+            "utilizada",
+            "emitida",
+        ]
+        read_only_fields = fields
+
+
+# Detalle histórico de cantidades, precios y entradas.
+class DetalleCompraSerializer(serializers.ModelSerializer):
+    entradas = EntradaSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = DetalleCompra
+        fields = [
+            "id",
+            "sector",
+            "cantidad",
+            "precio_unitario",
+            "entradas",
+        ]
+        read_only_fields = fields
+
+
+# Respuesta de la compra; el cliente no puede editar su estado.
+class CompraSerializer(serializers.ModelSerializer):
+    detalles = DetalleCompraSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Compra
+        fields = ["id", "estado", "total", "creada", "detalles"]
+        read_only_fields = fields
+
+# Solo admite los estados que puede asignar el organizador.
+class CambiarEstadoCompraSerializer(serializers.Serializer):
+    estado = serializers.ChoiceField(
+        choices=[
+            Compra.Estado.CANCELADO,
+            Compra.Estado.ENTREGADO,
+        ]
+    )

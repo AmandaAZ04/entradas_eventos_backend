@@ -8,6 +8,8 @@ from .views import (
     EventoViewSet,
     SectorViewSet,
     CarroTicketsViewSet,
+    CompraViewSet,
+    MisEntradasViewSet,
 )
 
 
@@ -17,6 +19,16 @@ router.register("recintos", RecintoViewSet, basename="recinto")
 router.register("eventos", EventoViewSet, basename="evento")
 router.register("sectores", SectorViewSet, basename="sector")
 router.register("carro-tickets", CarroTicketsViewSet, basename="carro-tickets")
+router.register(
+    "compras",
+    CompraViewSet,
+    basename="compra",
+)
+router.register(
+    "mis-entradas",
+    MisEntradasViewSet,
+    basename="mis-entradas",
+)
 
 urlpatterns = [
     path("token/", LoginView.as_view(), name="token_obtain_pair"),

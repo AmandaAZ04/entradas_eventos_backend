@@ -12,6 +12,16 @@ from rest_framework import mixins, status
 from .models import Carro, ItemCarro
 from .permissions import EsEspectador
 from .serializer import ItemCarroSerializer
+from drf_spectacular.utils import extend_schema
+from .models import Compra, Entrada
+from .serializer import CompraSerializer, EntradaSerializer
+from .services import pagar_carro
+from rest_framework.permissions import IsAuthenticated
+from .models import Usuario
+from .permissions import EsOrganizador
+from .serializer import CambiarEstadoCompraSerializer
+from .services import cambiar_estado_compra
+from .filters import EventoFilter, SectorFilter
 
 # Permite iniciar sesión sin tener un token previo.
 # SimpleJWT verifica el usuario y la contraseña.
@@ -33,7 +43,7 @@ class RecintoViewSet(viewsets.ModelViewSet):
 class EventoViewSet(viewsets.ModelViewSet):
     serializer_class = EventoSerializer
     permission_classes = [LecturaPublicaOrganizador]
-    filterset_fields = ["recinto", "artista", "activo"]
+    filterset_class = EventoFilter
 
     def get_queryset(self):
         from django.db.models import Q
@@ -76,7 +86,7 @@ class EventoViewSet(viewsets.ModelViewSet):
 class SectorViewSet(viewsets.ModelViewSet):
     serializer_class = SectorSerializer
     permission_classes = [LecturaPublicaOrganizador]
-    filterset_fields = ["evento"]
+    filterset_class = SectorFilter
     http_method_names = ["get", "post", "head", "options"]
 
     def get_queryset(self):
@@ -108,6 +118,10 @@ class CarroTicketsViewSet(
     filter_backends = []
 
     def get_queryset(self):
+        # Swagger genera el esquema sin un espectador autenticado.
+        if getattr(self, "swagger_fake_view", False):
+            return ItemCarro.objects.none()
+
         return ItemCarro.objects.filter(
             carro__usuario=self.request.user
         ).select_related(
@@ -165,3 +179,93 @@ class CarroTicketsViewSet(
         item.delete()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+# El espectador consulta sus compras.
+# El organizador consulta y gestiona ventas de sus eventos.
+class CompraViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
+    serializer_class = CompraSerializer
+    filter_backends = []
+
+    def get_permissions(self):
+        if self.action == "pagar":
+            return [EsEspectador()]
+
+        if self.action == "estado":
+            return [EsOrganizador()]
+
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Compra.objects.none()
+
+        usuario = self.request.user
+        queryset = Compra.objects.prefetch_related(
+            "detalles__entradas",
+            "detalles__sector__evento",
+        )
+
+        if usuario.rol == Usuario.Rol.ORGANIZADOR:
+            return queryset.filter(
+                detalles__sector__evento__organizador=usuario
+            ).distinct()
+
+        return queryset.filter(usuario=usuario)
+
+    # Checkout exclusivo del espectador.
+    @extend_schema(
+        request=None,
+        responses={201: CompraSerializer(many=True)},
+        description="Confirma el carro mediante pago simulado.",
+    )
+    @action(detail=False, methods=["post"])
+    def pagar(self, request):
+        compras = pagar_carro(request.user)
+
+        return Response(
+            self.get_serializer(compras, many=True).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    # PATCH /api/compras/{id}/estado/
+    @extend_schema(
+        request=CambiarEstadoCompraSerializer,
+        responses={200: CompraSerializer},
+    )
+    @action(detail=True, methods=["patch"])
+    def estado(self, request, pk=None):
+        compra = self.get_object()
+
+        serializer = CambiarEstadoCompraSerializer(
+            data=request.data
+        )
+        serializer.is_valid(raise_exception=True)
+
+        compra = cambiar_estado_compra(
+            compra_id=compra.pk,
+            organizador=request.user,
+            nuevo_estado=serializer.validated_data["estado"],
+        )
+
+        return Response(self.get_serializer(compra).data)
+
+
+# Cada espectador consulta exclusivamente sus propias entradas.
+class MisEntradasViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = EntradaSerializer
+    permission_classes = [EsEspectador]
+    filter_backends = []
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Entrada.objects.none()
+
+        return Entrada.objects.filter(
+            detalle__compra__usuario=self.request.user
+        ).select_related(
+            "detalle__sector__evento"
+        ).order_by("-emitida")
