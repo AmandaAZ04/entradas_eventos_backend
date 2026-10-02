@@ -31,6 +31,9 @@ class Recinto(models.Model):
 # Evento administrado por un organizador.
 # PROTECT conserva las referencias a usuarios y recintos.
 class Evento(models.Model):
+    # Portada configurable y etiqueta para distinguir eventos académicos.
+    imagen_url = models.URLField(max_length=1000, blank=True)
+    es_demo = models.BooleanField(default=False)
     nombre = models.CharField(max_length=200)
     artista = models.CharField(max_length=150)
     descripcion = models.TextField(blank=True)

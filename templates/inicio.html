@@ -1,50 +1,57 @@
-<!DOCTYPE html>
+{% load static %}
+<!doctype html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Entradas para Eventos</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            background: #f4f6fa;
-            color: #192234;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        main {
-            max-width: 800px;
-            margin: auto;
-            padding: 40px 24px;
-        }
-        a {
-            color: #244ec9;
-        }
-        footer {
-            padding: 24px;
-            text-align: center;
-            background: #192234;
-            color: white;
-        }
-    </style>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#161b18"><meta name="description" content="Descubre tu próximo concierto. Encore, plataforma académica de entradas.">
+  <title>encore. — Nos vemos en primera fila</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'encore/store.css' %}"><script src="{% static 'encore/store.js' %}" defer></script>
 </head>
 <body>
-    <main>
-        <h1>Entradas para Eventos y Conciertos</h1>
-        <p>Consulta eventos, sectores y disponibilidad de entradas.</p>
-        <p>
-            <a href="/api/eventos/">Consultar eventos</a>
-        </p>
-        <p>
-            <a href="/api/docs/">Documentación y pruebas de la API</a>
-        </p>
-    </main>
-
-    <footer>
-        <p>Nombre: [TU NOMBRE COMPLETO]</p>
-        <p>Sección: [TU SECCIÓN] · Año: 2026</p>
-    </footer>
-</body>
-</html>
+<svg class="svg-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+  <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M3 6h18v4a2 2 0 0 0 0 4v4H3v-4a2 2 0 0 0 0-4zM15 7v2m0 2v2m0 2v2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 11-8 11S4 16 4 10a8 8 0 1 1 16 0z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+  <symbol id="i-bag" viewBox="0 0 24 24"><path d="M5 7h14l2 14H3zM8 8V6a4 4 0 0 1 8 0v2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+</defs></svg>
+<a class="skip-link" href="#cartelera">Ir a la cartelera</a>
+<div class="announcement">TU PRÓXIMA GRAN HISTORIA EMPIEZA CON UNA ENTRADA <span>Proyecto académico · compras de prueba</span></div>
+<header class="site-header"><div class="header-inner">
+  <a class="brand" href="/" aria-label="Encore, inicio">encore<span>.</span><svg class="icon"><use href="#i-ticket"/></svg></a>
+  <nav aria-label="Navegación principal"><a class="nav-active" href="#cartelera">Eventos</a><button type="button" data-filter-link="K-pop">K-pop</button><button type="button" data-filter-link="Pop">Pop</button></nav>
+  <div class="header-actions"><button class="account-button" id="account-button" type="button" aria-label="Mi cuenta"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg><span id="account-label">Mi cuenta</span></button><button class="cart-button" id="cart-button" type="button" aria-label="Abrir mi carro"><svg class="icon"><use href="#i-bag"/></svg><span class="cart-word">Mi carro</span><span id="cart-count" class="cart-count">0</span></button></div>
+</div></header>
+<main>
+<section class="hero wrap" aria-labelledby="hero-title">
+  <div class="hero-main"><img class="hero-image" src="https://lumiere-a.akamaihd.net/v1/images/b577705257690e1467a1dc7e1bb8ea50_4096x2732_55e32d50.jpeg?region=0%2C0%2C4096%2C2732" alt="Taylor Swift en el escenario durante The Eras Tour" fetchpriority="high" referrerpolicy="no-referrer"><div class="hero-shade"></div>
+    <div class="hero-copy"><span class="eyebrow"><span class="live-dot"></span> PARA LOS QUE LO VIVEN EN VIVO</span><h1 id="hero-title">LA VIDA<br>SUENA MEJOR<br><span>EN VIVO.</span></h1><p>Ese coro que te sabes. Ese momento que no se repite.<br class="desktop-break"> Tu próximo concierto empieza aquí.</p><a class="button lime" href="#cartelera">Encuentra tu evento <svg class="icon"><use href="#i-arrow"/></svg></a></div>
+    <div class="hero-caption"><span>EN EL ESCENARIO</span> Taylor Swift <span class="caption-line"></span> The Eras Tour</div><span class="hero-index">01 / ENCORE SELECTS</span>
+  </div>
+  <aside class="hero-side"><div class="side-top"><span>EL FOCO ESTÁ EN</span><span class="star">✳</span></div><h2>K-POP.<br>TODO EL<br><em>VOLUMEN.</em></h2><p>Lightsticks arriba.<br>La emoción, al máximo.</p><div class="side-image"><img src="https://talkimg.imbc.com/TVianUpload/tvian/TViews/image/2025/10/13/89de54c2-bd4a-47b9-ae3a-257f4c7a43ac.jpg" alt="Los integrantes de ALPHA DRIVE ONE" referrerpolicy="no-referrer"><span>ALPHA DRIVE ONE</span></div><button type="button" class="side-link" data-filter-link="K-pop">Explora el K-pop <svg class="icon"><use href="#i-arrow"/></svg></button></aside>
+</section>
+<div class="marquee" aria-hidden="true"><div>LA MÚSICA NOS ENCUENTRA <span>✳</span> NOS VEMOS EN PRIMERA FILA <span>✳</span> LA MÚSICA NOS ENCUENTRA <span>✳</span> NOS VEMOS EN PRIMERA FILA <span>✳</span></div></div>
+<section class="catalogue wrap" id="cartelera" aria-labelledby="catalogue-title">
+  <div class="section-heading"><div><span class="eyebrow muted">TU PRÓXIMO PLAN</span><h2 id="catalogue-title">Hay un lugar para ti<span>.</span></h2></div><span id="event-count" class="event-count"></span></div>
+  <div class="filter-bar"><div class="category-tabs" role="group" aria-label="Tipo de música"><button class="active" data-category="Todos" aria-pressed="true">Todos</button><button data-category="K-pop" aria-pressed="false">K-pop</button><button data-category="Pop" aria-pressed="false">Pop</button><button data-category="Otros" aria-pressed="false">Más música</button></div><div class="search-controls"><label class="search-field"><svg class="icon"><use href="#i-search"/></svg><input id="event-search" type="search" placeholder="Busca tu artista o evento" aria-label="Buscar artista o evento"></label><label class="city-field"><svg class="icon"><use href="#i-pin"/></svg><select id="city-filter" aria-label="Filtrar por ciudad"><option value="">Todas las ciudades</option></select></label></div></div>
+  <div id="event-grid" class="event-grid" aria-live="polite"></div><div id="empty-catalogue" class="empty-state" hidden><span class="empty-symbol">✳</span><h3>No encontramos ese evento</h3><p>Prueba con otro artista o ciudad.</p><button class="button outline" id="clear-filters" type="button">Ver todos los eventos</button></div>
+  <p class="demo-note"><span class="demo-dot"></span>Los conciertos marcados como “Demo” son ficticios. Fechas y precios de ejemplo para la evaluación.</p>
+</section>
+<section class="experience wrap"><div class="experience-copy"><span class="eyebrow">MENOS VUELTAS. MÁS MÚSICA.</span><h2>Del “quiero ir”<br>al <em>“yo estuve ahí”.</em></h2><p>Elige tu evento, encuentra tu sector y lleva tus entradas contigo. Así de simple.</p><a href="#cartelera" class="text-link">Vamos a la cartelera <svg class="icon"><use href="#i-arrow"/></svg></a></div><div class="experience-steps"><article><span>01</span><div><h3>Encuentra tu momento</h3><p>Tu artista, tu ciudad, tu próximo recuerdo.</p></div></article><article><span>02</span><div><h3>Elige dónde vivirlo</h3><p>Consulta sectores, precios y disponibilidad.</p></div></article><article><span>03</span><div><h3>Tus entradas, contigo</h3><p>Guárdalas en tu cuenta y disfruta el show.</p></div></article></div></section>
+</main>
+<footer class="site-footer"><div class="wrap footer-main"><div><a href="/" class="brand">encore<span>.</span></a><p>Para los que piden una canción más.</p></div><div class="footer-links"><a href="#cartelera">Cartelera</a><button id="footer-tickets" type="button">Mis entradas</button><button id="help-button" type="button">¿Cómo funciona?</button></div><div class="student"><span>PROYECTO DESARROLLO BACKEND</span><strong>Amanda Angélica Álvarez Álvarez</strong><p>Sección IEC-N4-C1 · 2026</p></div></div><div class="wrap footer-bottom"><span>© 2026 Encore · Proyecto académico independiente</span><details><summary>Créditos de imágenes</summary><a href="https://press.disney.co.uk/gallery/taylor-swift-the-eras-tour-taylors-version-logos-and-key-art" target="_blank" rel="noopener noreferrer">Taylor Swift · Disney Press</a><a href="https://prtimes.jp/main/html/rd/p/000000573.000005358.html" target="_blank" rel="noopener noreferrer">TVXQ · SM Entertainment / KNTV</a><a href="https://enews.imbc.com/News/RetrieveNewsInfo/479817" target="_blank" rel="noopener noreferrer">ALPHA DRIVE ONE · iMBC</a><a href="https://www.soompi.com/article/1811739wpp/exclusive-alpha-drive-one-talks-survival-show-debut-hopes-for-the-future-and-more-at-euphoria-debut-showcase" target="_blank" rel="noopener noreferrer">ALD1 showcase · Soompi</a></details></div></footer>
+<dialog id="event-dialog" class="event-dialog"><button class="close-button" data-close type="button" aria-label="Cerrar detalle"><svg class="icon"><use href="#i-close"/></svg></button><div id="event-detail"></div></dialog>
+<dialog id="auth-dialog" class="auth-dialog"><button class="close-button" data-close type="button" aria-label="Cerrar cuenta"><svg class="icon"><use href="#i-close"/></svg></button><span class="eyebrow muted">TU ACCESO A PRIMERA FILA</span><h2 id="auth-title">Qué bueno verte.</h2><p id="auth-description">Entra para guardar tu carro y encontrar tus entradas.</p><form id="auth-form"><label>Usuario<input name="username" autocomplete="username" required maxlength="150" placeholder="Tu nombre de usuario"></label><label id="email-label" hidden>Correo electrónico<input name="email" type="email" autocomplete="email" placeholder="tu@correo.cl"></label><label>Contraseña<input name="password" type="password" autocomplete="current-password" required placeholder="Tu contraseña"></label><p class="form-error" id="auth-error" role="alert"></p><button class="button lime full" id="auth-submit" type="submit">Entrar a mi cuenta <svg class="icon"><use href="#i-arrow"/></svg></button></form><p class="auth-switch"><span id="auth-switch-text">¿Primera vez por aquí?</span> <button id="auth-toggle" type="button">Crea tu cuenta</button></p></dialog>
+<dialog id="account-dialog" class="auth-dialog"><button class="close-button" data-close type="button" aria-label="Cerrar mi cuenta"><svg class="icon"><use href="#i-close"/></svg></button><span class="eyebrow muted">TU ESPACIO EN ENCORE</span><h2 id="welcome-name">Mi cuenta</h2><div class="account-menu"><button id="my-tickets" type="button"><svg class="icon"><use href="#i-ticket"/></svg>Mis entradas <span>→</span></button><button id="my-orders" type="button"><svg class="icon"><use href="#i-bag"/></svg><span id="orders-label">Mis compras</span><span>→</span></button><button id="logout-button" type="button">Cerrar sesión <span>↗</span></button></div></dialog>
+<dialog id="drawer-dialog" class="drawer-dialog"><div class="drawer-heading"><div><span class="eyebrow muted" id="drawer-eyebrow">UN PASO MÁS CERCA</span><h2 id="drawer-title">Mi carro</h2></div><button class="close-button" data-close type="button" aria-label="Cerrar panel"><svg class="icon"><use href="#i-close"/></svg></button></div><div id="drawer-content" class="drawer-content"></div></dialog>
+<dialog id="help-dialog" class="auth-dialog"><button class="close-button" data-close type="button" aria-label="Cerrar ayuda"><svg class="icon"><use href="#i-close"/></svg></button><span class="eyebrow muted">TODO LO QUE NECESITAS</span><h2>Nos vemos en el show.</h2><p>Crea una cuenta de espectador, elige un concierto y agrega las entradas de tu sector favorito. Tu carro se guarda aunque cierres sesión.</p><p>Las entradas quedan confirmadas al completar la compra, siempre que haya disponibilidad. Encuentra sus códigos en “Mis entradas”.</p><div class="notice">Esta es una plataforma académica: los pagos son de prueba y no se solicitan datos bancarios.</div><button class="button lime full" data-close type="button">Entendido <svg class="icon"><use href="#i-check"/></svg></button></dialog>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<!-- Fotografía horizontal de ALD1: Soompi, showcase EUPHORIA.
+     https://www.soompi.com/article/1811739wpp/exclusive-alpha-drive-one-talks-survival-show-debut-hopes-for-the-future-and-more-at-euphoria-debut-showcase -->
+{{ eventos|json_script:"event-data" }}
+</body></html>

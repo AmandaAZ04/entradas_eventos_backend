@@ -22,6 +22,15 @@ from .permissions import EsOrganizador
 from .serializer import CambiarEstadoCompraSerializer
 from .services import cambiar_estado_compra
 from .filters import EventoFilter, SectorFilter
+from rest_framework.generics import CreateAPIView
+from .serializer import RegistroSerializer
+
+
+# Alta pública de espectadores para utilizar la tienda desde el navegador.
+class RegistroView(CreateAPIView):
+    serializer_class = RegistroSerializer
+    permission_classes = [AllowAny]
+    authentication_classes = []
 
 # Permite iniciar sesión sin tener un token previo.
 # SimpleJWT verifica el usuario y la contraseña.

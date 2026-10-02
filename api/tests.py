@@ -18,6 +18,31 @@ from .models import (
 
 # Cada prueba recibe datos independientes en una base de pruebas.
 class FlujoEntradasTests(TestCase):
+    # El formulario público no puede crear organizadores ni superusuarios.
+    def test_registro_publico_sin_escalamiento_de_privilegios(self):
+        respuesta = self.client.post(
+            "/api/registro/",
+            {"username": "nuevo_fan", "email": "fan@example.com",
+             "password": "UnaClaveDePrueba839!", "rol": "ORGANIZADOR",
+             "is_staff": True, "is_superuser": True},
+            format="json",
+        )
+        self.assertEqual(respuesta.status_code, 201)
+        usuario = Usuario.objects.get(username="nuevo_fan")
+        self.assertEqual(usuario.rol, Usuario.Rol.ESPECTADOR)
+        self.assertFalse(usuario.is_staff)
+        self.assertFalse(usuario.is_superuser)
+        self.assertTrue(usuario.check_password("UnaClaveDePrueba839!"))
+
+    def test_registro_rechaza_password_debil(self):
+        respuesta = self.client.post(
+            "/api/registro/",
+            {"username": "nuevo_fan", "email": "fan@example.com",
+             "password": "123"}, format="json",
+        )
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertFalse(Usuario.objects.filter(username="nuevo_fan").exists())
+
     def setUp(self):
         self.client = APIClient()
 

@@ -3,6 +3,23 @@ from rest_framework import serializers
 from .models import Recinto, Evento, Sector
 from .models import ItemCarro
 from .models import Compra, DetalleCompra, Entrada
+from .models import Usuario
+from django.contrib.auth.password_validation import validate_password
+
+
+# El registro público siempre crea espectadores, sin privilegios administrativos.
+class RegistroSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, validators=[validate_password])
+
+    class Meta:
+        model = Usuario
+        fields = ["id", "username", "email", "password"]
+        read_only_fields = ["id"]
+
+    def create(self, validated_data):
+        return Usuario.objects.create_user(
+            rol=Usuario.Rol.ESPECTADOR, **validated_data
+        )
 
 # Incluye el nombre de usuario y su rol en ambos tokens.
 class LoginSerializer(TokenObtainPairSerializer):
@@ -72,6 +89,8 @@ class EventoSerializer(serializers.ModelSerializer):
             "recinto",
             "organizador",
             "sectores",
+            "imagen_url",
+            "es_demo",
         ]
         read_only_fields = ["organizador"]
 

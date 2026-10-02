@@ -234,9 +234,23 @@ Ejecutar:
 .\env\Scripts\python.exe manage.py test api --verbosity 2
 ```
 
-Las diez pruebas verifican JWT, permisos, privacidad y persistencia del carro, stock, pago, emisión de entradas, cancelación y entrega.
+Las doce pruebas verifican JWT, permisos, privacidad y persistencia del carro, stock, pago, emisión de entradas, cancelación, entrega y registro seguro de espectadores.
 
 Django utiliza una base de datos de pruebas separada. El usuario de PostgreSQL debe tener permiso para crearla.
+
+## Tienda visual Encore
+
+La página principal permite buscar eventos, seleccionar sector y cantidad, crear una cuenta de espectador, iniciar sesión, gestionar el carro y completar compras de prueba. Las entradas y el historial se consultan desde “Mi cuenta”. Los organizadores pueden consultar sus ventas y cancelar o marcar el ingreso de una compra desde el mismo menú.
+
+Para cargar la cartelera ficticia de TVXQ, ALPHA DRIVE ONE y Taylor Swift:
+
+```powershell
+.\env\Scripts\python.exe manage.py cargar_demo
+```
+
+Este comando no sobrescribe eventos existentes ni repone stock de eventos ya cargados. Los conciertos demo están identificados como ficticios; no representan fechas ni ventas oficiales. Las fotografías externas tienen sus fuentes en el footer y requieren conexión a Internet.
+
+En el administrador puede configurarse `imagen_url` para dar una portada a cada evento. El registro público está disponible en `POST /api/registro/` y siempre crea espectadores sin privilegios de administración.
 
 ## Archivos de configuración
 

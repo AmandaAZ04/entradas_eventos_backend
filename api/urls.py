@@ -4,6 +4,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from .views import (
     LoginView,
+    RegistroView,
     RecintoViewSet,
     EventoViewSet,
     SectorViewSet,
@@ -31,6 +32,7 @@ router.register(
 )
 
 urlpatterns = [
+    path("registro/", RegistroView.as_view(), name="registro"),
     path("token/", LoginView.as_view(), name="token_obtain_pair"),
     path(
         "token/refresh/",
