@@ -1,8 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import Usuario
-
+from .models import Usuario, Recinto, Evento, Sector
 
 # Permite administrar usuarios y asignar sus roles
 # desde el panel administrativo de Django.
@@ -25,3 +24,29 @@ class UsuarioAdmin(UserAdmin):
     )
 
     list_filter = UserAdmin.list_filter + ("rol",)
+
+# Administración del catálogo de recintos, eventos y sectores.
+@admin.register(Recinto)
+class RecintoAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "ciudad")
+    search_fields = ("nombre", "ciudad")
+
+
+@admin.register(Evento)
+class EventoAdmin(admin.ModelAdmin):
+    list_display = (
+        "nombre",
+        "artista",
+        "fecha_hora",
+        "recinto",
+        "organizador",
+        "activo",
+    )
+    list_filter = ("activo", "recinto")
+    search_fields = ("nombre", "artista")
+
+
+@admin.register(Sector)
+class SectorAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "evento", "precio", "stock")
+    list_filter = ("evento",)
