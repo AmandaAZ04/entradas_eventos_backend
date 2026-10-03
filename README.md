@@ -34,7 +34,10 @@ Plataforma de venta de entradas con dos roles:
 - Emisión de entradas con UUID único.
 - Cancelación con devolución de stock e invalidación de tickets.
 - Registro de ingreso mediante el estado ENTREGADO.
-- Filtros por nombre, artista, ciudad, fecha, precio y stock.
+- Filtros por categoría, nombre, artista, ciudad, fecha, precio y stock.
+- Registro con nombre, apellido, RUT validado con módulo 11 o documento extranjero.
+- Email único sin distinguir mayúsculas y contraseña con reglas de complejidad.
+- Integración Webpay Plus con el SDK oficial de Transbank.
 - Página principal con los datos del estudiante.
 - Pruebas automáticas.
 
@@ -185,7 +188,9 @@ Enviar:
 | GET/POST | `/api/sectores/` | Lectura pública y creación por organizador del evento |
 | GET/POST | `/api/carro-tickets/` | Espectador |
 | DELETE | `/api/carro-tickets/{id}/` | Espectador propietario |
-| POST | `/api/compras/pagar/` | Espectador |
+| POST | `/api/compras/pagar/` | Espectador, crea sesión Webpay |
+| POST | `/api/compras/conciliar/` | Espectador, consulta sus pagos pendientes |
+| POST | `/api/registro/` | Público, crea únicamente espectadores |
 | GET | `/api/compras/` | Compras propias del espectador o ventas del organizador |
 | GET | `/api/compras/{id}/` | Usuario autorizado para esa compra |
 | GET | `/api/mis-entradas/` | Espectador |
@@ -193,17 +198,47 @@ Enviar:
 
 ## Flujo de compra
 
-1. El espectador agrega un sector y una cantidad al carro.
-2. Agregar al carro no modifica el stock ni garantiza disponibilidad.
-3. Al pagar, se comprueba la disponibilidad de todos los ítems.
-4. Se genera una compra por evento y se conservan sus precios.
-5. La compra pasa a PAGADO y se descuenta el stock.
-6. Se genera una entrada con UUID por cada ticket.
-7. Se vacían los ítems del carro, conservando el carro del usuario.
+1. El espectador agrega sectores y cantidades a su carro persistente, sin descontar stock.
+2. Checkout verifica disponibilidad y conserva precios en compras PENDIENTES, una por evento y vinculadas a un Pago.
+3. Transbank crea una sesión; solo entonces se vacían los ítems del carro. Un error al iniciar conserva el carro completo.
+4. El navegador envía `token_ws` por POST al checkout HTTPS de Transbank. Los datos bancarios nunca pasan por Encore.
+5. Webpay retorna por GET o POST a `/pago/retorno/`. El servidor consulta/confirma con el SDK y compara orden, sesión, monto, código de respuesta y estado.
+6. Solo una autorización válida cambia las compras a PAGADO, descuenta stock y emite un UUID por ticket, dentro de una transacción PostgreSQL.
+7. Un retorno repetido no emite entradas adicionales. Un pago rechazado o cancelado no descuenta inventario.
+8. Al cancelar una compra pagada, Webpay debe confirmar la devolución antes de restituir stock e invalidar entradas. Una devolución incierta se guarda para revisión, sin repetirla automáticamente.
 
 El checkout utiliza una transacción atómica y bloqueos de filas para coordinar los cambios de inventario.
 
-**El pago es simulado para fines académicos. No se realizan cobros ni se integra una pasarela de pago real.**
+**Webpay está integrado en ambiente de integración. Se abre la pantalla oficial de Transbank, pero no se cobra dinero real. Las pruebas automatizadas usan respuestas controladas del proveedor; también se comprobó una sesión real de integración y su cancelación en el navegador, sin ingresar tarjetas.**
+
+La reserva temporal de checkout dura 15 minutos y se calcula desde compras pendientes, sin reducir el campo stock. Se bloquean sectores en orden estable al crear sesiones y al emitir tickets. Si una reserva vencida pierde disponibilidad y el proveedor ya autorizó, se solicita reversa; una respuesta incierta requiere conciliación comercial y no emite entradas.
+
+### Recuperar un pago pendiente
+
+El espectador puede usar «Consultar pago pendiente en Webpay» dentro de Mis compras. El endpoint `POST /api/compras/conciliar/` consulta exclusivamente sus pagos y no confirma sesiones bancarias sin autorización. También puede ejecutarse desde el servidor:
+
+```powershell
+.\env\Scripts\python.exe manage.py conciliar_pagos
+```
+
+Una devolución con estado REVISION debe contrastarse con el portal comercial de Transbank. No se debe borrar el intento ni repetir el reembolso sin comprobar el resultado del proveedor.
+
+### Activar cobros comerciales
+
+Requiere cuenta de comercio Webpay, validación/puesta en producción con Transbank y un despliegue HTTPS público. Configurar las credenciales privadas únicamente en `.env`:
+
+```dotenv
+WEBPAY_ENVIRONMENT=production
+WEBPAY_COMMERCE_CODE=tu_codigo_comercial
+WEBPAY_API_KEY=tu_clave_privada
+WEBPAY_RETURN_URL=https://tu-dominio/pago/retorno/
+DJANGO_ALLOWED_HOSTS=tu-dominio
+DJANGO_DEBUG=False
+```
+
+No basta cambiar el ambiente: se deben configurar HTTPS, base de datos de producción, supervisión y conciliación periódica. Los conciertos `es_demo=True` están bloqueados para cobros reales. Registra eventos auténticos y autorizados antes de habilitar ventas comerciales. El proyecto local no está certificado ni desplegado como comercio real.
+
+Referencia: [SDK oficial de Transbank](https://github.com/TransbankDevelopers/transbank-sdk-python) y [ejemplo oficial Webpay Plus en Python](https://proyecto-ejemplo-python.transbankdevelopers.cl/webpay-plus/).
 
 ## Estados
 
@@ -219,6 +254,7 @@ El organizador puede cambiar una compra PAGADA a CANCELADO o ENTREGADO. Repetir 
 Ejemplos:
 
 ```text
+/api/eventos/?categoria=KPOP
 /api/eventos/?nombre=concierto
 /api/eventos/?artista=banda
 /api/eventos/?ciudad=Santiago
@@ -234,23 +270,23 @@ Ejecutar:
 .\env\Scripts\python.exe manage.py test api --verbosity 2
 ```
 
-Las doce pruebas verifican JWT, permisos, privacidad y persistencia del carro, stock, pago, emisión de entradas, cancelación, entrega y registro seguro de espectadores.
+Las 42 pruebas verifican JWT/refresh/roles, permisos, persistencia desde otro cliente, privacidad, filtros, precios históricos, múltiples eventos, validaciones de registro, Webpay aprobado/rechazado/cancelado/incierto, emisión única, reembolso y entrega. Una prueba usa conexiones PostgreSQL concurrentes para disputar el último ticket y repetir simultáneamente la confirmación.
 
 Django utiliza una base de datos de pruebas separada. El usuario de PostgreSQL debe tener permiso para crearla.
 
 ## Tienda visual Encore
 
-La página principal permite buscar eventos, seleccionar sector y cantidad, crear una cuenta de espectador, iniciar sesión, gestionar el carro y completar compras de prueba. Las entradas y el historial se consultan desde “Mi cuenta”. Los organizadores pueden consultar sus ventas y cancelar o marcar el ingreso de una compra desde el mismo menú.
+La página principal permite buscar eventos, seleccionar sector y cantidad, crear una cuenta de espectador, iniciar sesión, gestionar el carro y continuar al checkout de Webpay. Las entradas y el historial se consultan desde “Mi cuenta”. Los organizadores pueden consultar sus ventas y cancelar o marcar el ingreso de una compra desde el mismo menú.
 
-Para cargar la cartelera ficticia de TVXQ, ALPHA DRIVE ONE y Taylor Swift:
+Para cargar trece eventos ilustrativos de TVXQ, ALPHA DRIVE ONE, Taylor Swift, Billie Eilish, DAY6, TXT, BABYMONSTER, aespa, NCT WISH, Santos Bravos, Red Velvet, ZEROBASEONE y Wanna One:
 
 ```powershell
 .\env\Scripts\python.exe manage.py cargar_demo
 ```
 
-Este comando no sobrescribe eventos existentes ni repone stock de eventos ya cargados. Los conciertos demo están identificados como ficticios; no representan fechas ni ventas oficiales. Las fotografías externas tienen sus fuentes en el footer y requieren conexión a Internet.
+Este comando no sobrescribe eventos existentes ni repone stock de eventos ya cargados. Solo completa la categoría de los eventos demo antiguos que seguían clasificados como Otros. Los conciertos demo están identificados como ficticios; no representan fechas ni ventas oficiales. Las fotografías externas tienen sus fuentes en el footer y requieren conexión a Internet.
 
-En el administrador puede configurarse `imagen_url` para dar una portada a cada evento. El registro público está disponible en `POST /api/registro/` y siempre crea espectadores sin privilegios de administración.
+En el administrador puede configurarse `imagen_url` para dar una portada a cada evento. Las categorías vacías muestran un mensaje y se pueden seleccionar desde el desplegable. El registro público está disponible en `POST /api/registro/` y siempre crea espectadores sin privilegios de administración.
 
 ## Archivos de configuración
 
@@ -258,3 +294,25 @@ En el administrador puede configurarse `imagen_url` para dar una portada a cada 
 - `.env.example`: ejemplo de configuración sin credenciales reales.
 - `.env`: configuración privada local, excluida de Git.
 - `env/`: entorno virtual local, excluido de Git.
+
+
+## Registro y validaciones
+
+La interfaz está en español. Se solicitan nombres, apellido paterno, email y contraseña; usuarios chilenos requieren RUT con dígito verificador válido. Extranjeros requieren un documento de 5–30 letras, números o guiones. RUT y documento extranjero se normalizan y no se repiten. Los correos se comparan sin distinguir mayúsculas. Los usuarios antiguos pueden seguir iniciando sesión con su username; las cuentas nuevas también ingresan mediante su email.
+
+La contraseña tiene entre 8 y 16 caracteres, no admite espacios, requiere mayúscula, minúscula, número y al menos uno de `@ $ # *`. También se mantienen los validadores de Django contra contraseñas comunes o similares a los datos personales. Las contraseñas se guardan con el hash de Django; el hash rápido MD5 se activa únicamente dentro de las pruebas, nunca en el servidor normal.
+
+La API impide fechas nuevas vencidas, precios negativos o con fracciones de peso, cantidades menores a 1 o mayores a 20 por sector, sectores agotados y cantidades acumuladas mayores al stock disponible. El checkout vuelve a verificar disponibilidad. El administrador valida fechas y precios antes de guardar; los pagos y reembolsos se muestran únicamente como auditoría de lectura.
+
+El límite de intentos de registro/login ayuda a evitar abuso, pero el cache local y el servidor de desarrollo no sustituyen una configuración comercial de producción.
+
+
+### Asientos y ciudades
+
+Cada concierto dispone de un plano común con Cancha, Tribuna y VIP. Las sillas se seleccionan por fila y número, se guardan en el carro y aparecen en la entrada comprada. Una reserva de pago vigente bloquea esas sillas; la cancelación libera las entradas. La base de datos impide emitir dos entradas válidas para la misma silla.
+
+`GET /api/eventos/{id}/asientos/` consulta el plano y su disponibilidad. El carro recibe `asientos` como lista de IDs, junto con el sector y una cantidad igual al número de sillas seleccionadas.
+
+La cartelera incluye Santiago, Viña del Mar, Concepción, Valparaíso, Antofagasta, La Serena y Temuco. Para preparar los asientos y ciudades de la cartelera incluida, ejecuta `python manage.py configurar_recintos`. Repetir el comando conserva los IDs y el stock.
+
+El retorno de Webpay redirige al inicio con un mensaje basado en el resultado verificado por el servidor. La autorización bancaria y las pantallas del proveedor pertenecen a Transbank; activar cobros comerciales requiere credenciales de producción.

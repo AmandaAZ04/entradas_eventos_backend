@@ -13,7 +13,6 @@ from .views import (
     MisEntradasViewSet,
 )
 
-
 # El router genera automáticamente las rutas del catálogo.
 router = DefaultRouter()
 router.register("recintos", RecintoViewSet, basename="recinto")

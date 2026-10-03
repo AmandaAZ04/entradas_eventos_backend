@@ -5,12 +5,8 @@ from .models import Evento, Sector
 
 # Búsqueda de eventos por nombre, artista, ciudad y fechas.
 class EventoFilter(django_filters.FilterSet):
-    nombre = django_filters.CharFilter(
-        lookup_expr="icontains"
-    )
-    artista = django_filters.CharFilter(
-        lookup_expr="icontains"
-    )
+    nombre = django_filters.CharFilter(lookup_expr="icontains")
+    artista = django_filters.CharFilter(lookup_expr="icontains")
     ciudad = django_filters.CharFilter(
         field_name="recinto__ciudad",
         lookup_expr="icontains",
@@ -26,7 +22,7 @@ class EventoFilter(django_filters.FilterSet):
 
     class Meta:
         model = Evento
-        fields = ["recinto", "activo"]
+        fields = ["recinto", "activo", "categoria"]
 
 
 # Filtrado de sectores por evento, precio y disponibilidad.

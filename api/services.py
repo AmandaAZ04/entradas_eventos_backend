@@ -1,167 +1,105 @@
-from decimal import Decimal
+"""Cambios de estado autorizados, devolución bancaria y restitución de stock."""
 
 from django.db import transaction
-from django.utils import timezone
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from .models import (
-    Carro,
-    Compra,
-    DetalleCompra,
-    Entrada,
-    Sector,
-)
-from rest_framework.exceptions import PermissionDenied
+from .models import Compra, Entrada, Pago, Reembolso, Sector
+from .payments import cliente_webpay, reembolso_confirmado
 
-# Checkout con pago simulado.
-# Si falla cualquier paso, PostgreSQL revierte toda la operación.
-@transaction.atomic
-def pagar_carro(usuario):
-    carro = Carro.objects.select_for_update().filter(
-        usuario=usuario
-    ).first()
 
-    if carro is None:
-        raise ValidationError("El carro está vacío.")
+def verificar_organizador(compra, organizador):
+    if (
+        not compra.detalles.exists()
+        or compra.detalles.exclude(sector__evento__organizador=organizador).exists()
+    ):
+        raise PermissionDenied("Solo puedes gestionar compras de tus eventos.")
 
-    items = list(carro.items.order_by("sector_id"))
 
-    if not items:
-        raise ValidationError("El carro está vacío.")
-
-    # Bloquea los sectores en un orden estable para evitar que
-    # dos compradores descuenten simultáneamente el mismo stock.
-    sectores = {
-        sector.pk: sector
-        for sector in Sector.objects.select_for_update(
-            of=("self",)
-        ).select_related("evento").filter(
-            pk__in=[item.sector_id for item in items]
-        ).order_by("pk")
-    }
-
-    # Comprueba todo el carro antes de generar las compras.
-    grupos = {}
-
-    for item in items:
-        sector = sectores[item.sector_id]
-        evento = sector.evento
-
-        if not evento.activo or evento.fecha_hora <= timezone.now():
-            raise ValidationError(
-                f"El evento {evento.nombre} no está disponible."
-            )
-
-        if item.cantidad > sector.stock:
-            raise ValidationError(
-                f"Stock insuficiente en {sector.nombre}. "
-                f"Disponibles: {sector.stock}."
-            )
-
-        grupos.setdefault(evento.pk, []).append(item)
-
-    compras = []
-
-    # Se genera una compra por evento, conservando los precios
-    # y cantidades como parte del historial.
-    for items_evento in grupos.values():
-        compra = Compra.objects.create(usuario=usuario)
-        total = Decimal("0.00")
-
-        for item in items_evento:
-            sector = sectores[item.sector_id]
-
-            detalle = DetalleCompra.objects.create(
-                compra=compra,
-                sector=sector,
-                cantidad=item.cantidad,
-                precio_unitario=sector.precio,
-            )
-
-            total += sector.precio * item.cantidad
-
-            # Una entrada individual por cada ticket comprado.
-            # El modelo asigna automáticamente su UUID.
-            Entrada.objects.bulk_create([
-                Entrada(detalle=detalle)
-                for _ in range(item.cantidad)
-            ])
-
-        # El pago simulado se aprueba tras validar disponibilidad.
-        # El cambio a PAGADO y el descuento se guardan juntos.
-        compra.total = total
-        compra.estado = Compra.Estado.PAGADO
-        compra.save(update_fields=["total", "estado"])
-
-        for item in items_evento:
-            sector = sectores[item.sector_id]
-            sector.stock -= item.cantidad
-            sector.save(update_fields=["stock"])
-
-        compras.append(compra)
-
-    # Se vacían los ítems, conservando el carro del usuario.
-    carro.items.all().delete()
-
-    return compras
-
-# Cambia el estado, las entradas y el stock en una sola operación.
-@transaction.atomic
 def cambiar_estado_compra(compra_id, organizador, nuevo_estado):
-    compra = Compra.objects.select_for_update().get(
-        pk=compra_id
-    )
-
-    detalles = list(compra.detalles.order_by("sector_id"))
-
-    # Verifica que todos los detalles pertenezcan al organizador.
-    if not detalles or compra.detalles.exclude(
-        sector__evento__organizador=organizador
-    ).exists():
-        raise PermissionDenied(
-            "Solo puedes gestionar compras de tus eventos."
-        )
-
-    if nuevo_estado not in {
-        Compra.Estado.CANCELADO,
-        Compra.Estado.ENTREGADO,
-    }:
+    if nuevo_estado not in {Compra.Estado.CANCELADO, Compra.Estado.ENTREGADO}:
         raise ValidationError("Estado no permitido.")
-
-    # Repetir la petición no duplica la devolución del stock.
+    compra = Compra.objects.get(pk=compra_id)
+    verificar_organizador(compra, organizador)
     if compra.estado == nuevo_estado:
         return compra
-
     if compra.estado != Compra.Estado.PAGADO:
-        raise ValidationError(
-            "Solo puedes cancelar o entregar una compra pagada."
-        )
+        raise ValidationError("Solo puedes cancelar o entregar una compra pagada.")
+    if nuevo_estado == Compra.Estado.CANCELADO and compra.pago_id:
+        # El intento se guarda ANTES de contactar al banco. Si la conexión se
+        # corta después de devolver dinero, no repetimos una devolución incierta.
+        with transaction.atomic():
+            Pago.objects.select_for_update().get(pk=compra.pago_id)
+            compra = Compra.objects.select_for_update().get(pk=compra_id)
+            if compra.estado == Compra.Estado.CANCELADO:
+                return compra
+            if compra.estado != Compra.Estado.PAGADO:
+                raise ValidationError("Esta compra ya no puede cancelarse.")
+            intento, creado = Reembolso.objects.get_or_create(
+                compra=compra, defaults={"estado": "SOLICITADO"}
+            )
+            if not creado and intento.estado != "CONFIRMADO":
+                raise ValidationError(
+                    "La devolución anterior necesita conciliación. No se repetirá el cobro ni el reembolso."
+                )
+        if creado:
+            try:
+                respuesta = cliente_webpay(compra.pago.ambiente).refund(
+                    compra.pago.token, int(compra.total)
+                )
+                confirmado = reembolso_confirmado(respuesta)
+            except Exception:
+                confirmado = False
+            intento.estado = "CONFIRMADO" if confirmado else "REVISION"
+            intento.save(update_fields=["estado"])
+            if not confirmado:
+                raise ValidationError(
+                    "Webpay no confirmó la devolución. La compra sigue pagada y requiere revisión."
+                )
+    return aplicar_estado(compra_id, organizador, nuevo_estado)
 
-    entradas = Entrada.objects.filter(
-        detalle__compra=compra
-    )
 
+@transaction.atomic
+def aplicar_estado(compra_id, organizador, nuevo_estado):
+    referencia = Compra.objects.get(pk=compra_id)
+    if referencia.pago_id:
+        Pago.objects.select_for_update().get(pk=referencia.pago_id)
+    compra = Compra.objects.select_for_update().get(pk=compra_id)
+    verificar_organizador(compra, organizador)
+    if compra.estado == nuevo_estado:
+        return compra
+    if compra.estado != Compra.Estado.PAGADO:
+        raise ValidationError("Solo puedes cancelar o entregar una compra pagada.")
+    # No se puede entregar mientras se devuelve el dinero.
+    if (
+        nuevo_estado == Compra.Estado.ENTREGADO
+        and Reembolso.objects.filter(compra=compra).exists()
+    ):
+        raise ValidationError("Esta compra tiene una devolución en curso.")
+    entradas = Entrada.objects.filter(detalle__compra=compra)
     if nuevo_estado == Compra.Estado.CANCELADO:
-        # Los sectores se bloquean en el mismo orden del pago.
+        if (
+            compra.pago_id
+            and not Reembolso.objects.filter(
+                compra=compra, estado="CONFIRMADO"
+            ).exists()
+        ):
+            raise ValidationError(
+                "El banco debe confirmar la devolución antes de cancelar."
+            )
+        detalles = list(compra.detalles.order_by("sector_id"))
         sectores = {
-            sector.pk: sector
-            for sector in Sector.objects.select_for_update().filter(
-                pk__in=[detalle.sector_id for detalle in detalles]
-            ).order_by("pk")
+            s.pk: s
+            for s in Sector.objects.select_for_update()
+            .filter(pk__in=[d.sector_id for d in detalles])
+            .order_by("pk")
         }
-
         for detalle in detalles:
             sector = sectores[detalle.sector_id]
             sector.stock += detalle.cantidad
             sector.save(update_fields=["stock"])
-
-        # Conserva los UUID como historial, pero invalida los tickets.
         entradas.update(valida=False)
-
-    elif nuevo_estado == Compra.Estado.ENTREGADO:
+    else:
         entradas.update(utilizada=True)
-
     compra.estado = nuevo_estado
     compra.save(update_fields=["estado"])
-
     return compra

@@ -5,11 +5,11 @@ from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularSwaggerView,
 )
-from api.web_views import inicio
-
+from api.web_views import inicio, webpay_retorno
 
 # Administración, documentación pública y rutas de la API.
 urlpatterns = [
+    path("pago/retorno/", webpay_retorno, name="webpay-retorno"),
     path("admin/", admin.site.urls),
     path(
         "api/schema/",

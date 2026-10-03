@@ -1,7 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import Usuario, Recinto, Evento, Sector
+from .models import Usuario, Recinto, Evento, Sector, Pago, Reembolso
+
 
 # Permite administrar usuarios y asignar sus roles
 # desde el panel administrativo de Django.
@@ -9,6 +10,7 @@ from .models import Usuario, Recinto, Evento, Sector
 class UsuarioAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
         ("Rol del sistema", {"fields": ("rol",)}),
+        ("Identificación", {"fields": ("extranjero", "rut", "documento_extranjero")}),
     )
 
     add_fieldsets = UserAdmin.add_fieldsets + (
@@ -24,6 +26,7 @@ class UsuarioAdmin(UserAdmin):
     )
 
     list_filter = UserAdmin.list_filter + ("rol",)
+
 
 # Administración del catálogo de recintos, eventos y sectores.
 @admin.register(Recinto)
@@ -42,7 +45,7 @@ class EventoAdmin(admin.ModelAdmin):
         "organizador",
         "activo",
     )
-    list_filter = ("activo", "recinto")
+    list_filter = ("activo", "recinto", "categoria", "es_demo")
     search_fields = ("nombre", "artista")
 
 
@@ -50,3 +53,29 @@ class EventoAdmin(admin.ModelAdmin):
 class SectorAdmin(admin.ModelAdmin):
     list_display = ("nombre", "evento", "precio", "stock")
     list_filter = ("evento",)
+
+
+# Auditoría sin cambiar estados, inventario ni tokens manualmente.
+class AuditoriaAdmin(admin.ModelAdmin):
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Pago)
+class PagoAdmin(AuditoriaAdmin):
+    list_display = ("orden", "usuario", "total", "estado", "ambiente", "creada")
+    list_filter = ("estado", "ambiente")
+    search_fields = ("orden", "usuario__username")
+    exclude = ("token", "url")
+
+
+@admin.register(Reembolso)
+class ReembolsoAdmin(AuditoriaAdmin):
+    list_display = ("compra", "estado", "creado")
+    list_filter = ("estado",)

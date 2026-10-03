@@ -28,13 +28,14 @@ class LecturaPublicaOrganizador(BasePermission):
 
         return True
 
+
 # Solo los espectadores autenticados pueden utilizar el carro.
 class EsEspectador(BasePermission):
     def has_permission(self, request, view):
         return (
-            request.user.is_authenticated
-            and request.user.rol == Usuario.Rol.ESPECTADOR
+            request.user.is_authenticated and request.user.rol == Usuario.Rol.ESPECTADOR
         )
+
 
 # Permite gestionar ventas únicamente a los organizadores.
 class EsOrganizador(BasePermission):
