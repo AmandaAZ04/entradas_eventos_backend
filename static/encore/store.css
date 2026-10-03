@@ -2351,3 +2351,332 @@ body:has(dialog[open]) {
     letter-spacing: 0.7px;
   }
 }
+
+/* El espacio de gestión mantiene la identidad de Encore y se adapta al celular. */
+.organizer-access {
+  font-size: 11px;
+  border: 1px solid var(--line);
+  padding: 10px 13px;
+  border-radius: 30px;
+  background: transparent;
+  white-space: nowrap;
+}
+.account-role {
+  color: var(--muted);
+  font-size: 12px;
+  margin: -8px 0 22px;
+}
+.organizer-dialog {
+  width: min(1000px, calc(100vw - 40px));
+  padding: 36px;
+  border: 0;
+  border-radius: 24px;
+  background: var(--paper, #f8f9f3);
+  max-height: 90vh;
+  overflow: auto;
+  color: var(--ink);
+}
+.organizer-heading {
+  padding-right: 40px;
+}
+.organizer-heading h2 {
+  font: 600 35px/1.15 var(--display);
+  letter-spacing: -1px;
+  margin: 14px 0 10px;
+}
+.organizer-heading p {
+  font-size: 13px;
+  color: var(--muted);
+}
+.organizer-nav {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  padding: 20px 0;
+  margin-bottom: 26px;
+}
+.organizer-nav button {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 11px 18px;
+  font-size: 12px;
+  background: transparent;
+}
+.organizer-nav button.active {
+  background: var(--ink);
+  color: white;
+  border-color: var(--ink);
+}
+.org-overview {
+  display: flex;
+  gap: 35px;
+  align-items: center;
+  padding: 20px 25px;
+  background: #edf1e5;
+  border-radius: 18px;
+  margin-bottom: 24px;
+}
+.org-overview > div {
+  display: grid;
+  gap: 4px;
+}
+.org-overview strong {
+  font: 600 32px var(--display);
+}
+.org-overview span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.org-overview > .button {
+  margin-left: auto;
+}
+.org-event-list {
+  display: grid;
+  gap: 14px;
+}
+.org-event-card {
+  display: flex;
+  gap: 22px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+.org-event-card > img {
+  width: 110px;
+  height: 145px;
+  object-fit: cover;
+  border-radius: 12px;
+  align-self: start;
+}
+.org-event-card > div {
+  min-width: 0;
+  flex: 1;
+}
+.org-event-card h3 {
+  font: 600 21px var(--display);
+  margin: 10px 0;
+}
+.org-event-card p {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 8px 0;
+}
+.org-status {
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  background: #dcebcf;
+  border-radius: 20px;
+  padding: 5px 9px;
+}
+.org-status.paused {
+  background: #ede4d9;
+}
+.org-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 15px;
+}
+.org-actions button {
+  font-size: 11px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 8px 12px;
+  background: white;
+}
+.org-actions .org-danger {
+  color: #985139;
+}
+.org-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+}
+.org-columns h3,
+.org-form-heading h3 {
+  font: 600 25px var(--display);
+  margin: 12px 0;
+}
+.org-form-heading p {
+  font-size: 12px;
+  color: var(--muted);
+}
+.org-form {
+  display: grid;
+  gap: 18px;
+  margin-top: 24px;
+}
+.org-form label {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.org-form input,
+.org-form select,
+.org-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: white;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 13px;
+  font: 400 13px var(--body, "DM Sans", sans-serif);
+  min-width: 0;
+}
+.org-form textarea {
+  resize: vertical;
+}
+.org-form .button {
+  justify-self: start;
+}
+.org-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.org-sector-section {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+.org-section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.org-section-heading h4 {
+  margin: 0;
+  font: 600 17px var(--display);
+}
+.org-sector-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 0.8fr 25px;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 15px;
+}
+.org-remove-sector {
+  height: 42px;
+  border: 0;
+  background: transparent;
+  font-size: 22px;
+  color: var(--muted);
+}
+.org-sector-section small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.org-form-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.org-venues {
+  display: grid;
+  gap: 13px;
+  max-height: 450px;
+  overflow: auto;
+}
+.org-venues article {
+  background: white;
+  border: 1px solid var(--line);
+  padding: 17px;
+  border-radius: 12px;
+}
+.org-venues strong {
+  font-size: 13px;
+}
+.org-venues p {
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--muted);
+  margin-bottom: 0;
+}
+.org-empty {
+  text-align: center;
+  padding: 40px 20px;
+}
+.org-empty h3 {
+  font: 600 25px var(--display);
+}
+.org-empty p,
+.org-loading {
+  font-size: 13px;
+  color: var(--muted);
+}
+.org-current-sectors {
+  padding: 18px;
+  background: #eef1e8;
+  border-radius: 12px;
+  font-size: 12px;
+}
+@media (max-width: 650px) {
+  .organizer-dialog {
+    width: calc(100vw - 24px);
+    padding: 24px 18px;
+  }
+  .organizer-heading h2 {
+    font-size: 27px;
+  }
+  .org-columns,
+  .org-fields {
+    grid-template-columns: 1fr;
+  }
+  .org-overview {
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 18px;
+  }
+  .org-overview > .button {
+    margin-left: 0;
+    width: 100%;
+  }
+  .org-overview strong {
+    font-size: 25px;
+  }
+  .org-event-card {
+    gap: 12px;
+    padding: 13px;
+  }
+  .org-event-card > img {
+    width: 65px;
+    height: 90px;
+  }
+  .org-event-card h3 {
+    font-size: 17px;
+  }
+  .org-sector-row {
+    grid-template-columns: 1fr 1fr 25px;
+    gap: 8px;
+  }
+  .org-sector-row > label:first-child {
+    grid-column: 1/3;
+  }
+  .org-sector-row > .org-remove-sector {
+    grid-column: 3;
+    grid-row: 1/3;
+  }
+  .org-sector-section {
+    padding: 14px;
+  }
+  .organizer-nav {
+    gap: 6px;
+  }
+  .organizer-nav button {
+    padding: 9px 12px;
+    font-size: 11px;
+  }
+  .organizer-access {
+    font-size: 9px;
+    padding: 8px;
+  }
+  .header-actions {
+    gap: 5px;
+  }
+}

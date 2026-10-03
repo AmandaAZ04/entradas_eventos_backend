@@ -28,6 +28,7 @@ from .serializer import (
     CompraSerializer,
     EntradaSerializer,
     EventoSerializer,
+    EventoCompletoSerializer,
     ItemCarroSerializer,
     LoginSerializer,
     MapaSectorSerializer,
@@ -38,7 +39,7 @@ from .serializer import (
 )
 from .services import cambiar_estado_compra
 from .payments import confirmar_pago, iniciar_pago
-from .seating import asientos_ocupados
+from .seating import asientos_ocupados, generar_asientos
 
 
 # Alta pública de espectadores para utilizar la tienda desde el navegador.
@@ -90,6 +91,40 @@ class EventoViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(organizador=self.request.user)
 
+    # Panel privado: nunca muestra eventos gestionados por otro organizador.
+    @extend_schema(responses=EventoSerializer(many=True))
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="mis-eventos",
+        permission_classes=[EsOrganizador],
+    )
+    def mis_eventos(self, request):
+        queryset = self.get_queryset().filter(organizador=request.user)
+        return Response(
+            EventoSerializer(
+                queryset, many=True, context=self.get_serializer_context()
+            ).data
+        )
+
+    @extend_schema(request=EventoCompletoSerializer, responses={201: EventoSerializer})
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="crear-completo",
+        permission_classes=[EsOrganizador],
+    )
+    def crear_completo(self, request):
+        serializer = EventoCompletoSerializer(
+            data=request.data, context=self.get_serializer_context()
+        )
+        serializer.is_valid(raise_exception=True)
+        evento = serializer.save(organizador=request.user)
+        return Response(
+            EventoSerializer(evento, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+        )
+
     # Desactiva el evento conservando su historial de compras.
     def perform_destroy(self, instance):
         instance.activo = False
@@ -139,6 +174,11 @@ class SectorViewSet(viewsets.ModelViewSet):
             ).order_by("nombre")
 
         return queryset.filter(evento__activo=True).order_by("nombre")
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        sector = serializer.save()
+        generar_asientos(sector)
 
 
 # Permite listar, agregar y eliminar los ítems del carro.
@@ -318,6 +358,8 @@ class MisEntradasViewSet(viewsets.ReadOnlyModelViewSet):
 
         return (
             Entrada.objects.filter(detalle__compra__usuario=self.request.user)
-            .select_related("detalle__sector__evento", "detalle__compra__pago", "asiento")
+            .select_related(
+                "detalle__sector__evento", "detalle__compra__pago", "asiento"
+            )
             .order_by("-emitida")
         )

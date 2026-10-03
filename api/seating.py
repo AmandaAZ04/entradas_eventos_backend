@@ -51,3 +51,15 @@ def validar_asientos(sector, ids, cantidad, ocupados=None):
                 "asientos": "Uno de los asientos elegidos ya no está disponible. Selecciona otro en el mapa."
             }
         )
+
+
+# El plano de cada sector se crea al registrarlo; no modifica el inventario.
+def generar_asientos(sector):
+    existentes = set(sector.asientos.values_list("fila", "numero"))
+    nuevos = []
+    for n in range(sector.stock):
+        fila = chr(65 + n // 10) if n // 10 < 26 else f"F{n // 10 + 1}"
+        numero = n % 10 + 1
+        if (fila, numero) not in existentes:
+            nuevos.append(Asiento(sector=sector, fila=fila, numero=numero))
+    Asiento.objects.bulk_create(nuevos)

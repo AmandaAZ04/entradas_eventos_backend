@@ -148,6 +148,14 @@
       : "Mi cuenta";
     const organizer = session?.usuario.rol === "ORGANIZADOR";
     $("#my-tickets").hidden = organizer;
+    $("#my-events").hidden = !organizer;
+    $("#account-role").textContent = organizer
+      ? "Cuenta de organizador"
+      : "Cuenta de espectador";
+    $("#organizer-access").textContent = organizer
+      ? "Mi panel"
+      : "Organizadores";
+    $("#cart-button").hidden = organizer;
     $("#orders-label").textContent = organizer ? "Mis ventas" : "Mis compras";
     if (!session || organizer) $("#cart-count").textContent = "0";
   }
@@ -465,6 +473,7 @@
     checkPassword();
   }
   function openAuth() {
+    $(".auth-switch").hidden = false;
     setAuthMode("login");
     showDialog("#auth-dialog");
   }
@@ -561,6 +570,7 @@
       const action = pendingAction;
       pendingAction = null;
       if (action) await action();
+      else if (data.usuario.rol === "ORGANIZADOR") await openOrganizer();
     } catch (error) {
       if (registered) setAuthMode("login");
       else showFieldErrors(error.fields || {});
@@ -737,6 +747,316 @@
         `<div class="error-box">${escape(error.message)}</div>`;
     }
   }
+  // Panel del organizador: la API vuelve a comprobar rol y propiedad en cada acción.
+  const categoryOptions = JSON.parse($("#category-data").textContent);
+  let organizationEvents = [],
+    organizationVenues = [],
+    sectorDraft = 0;
+  function organizerAllowed() {
+    if (!session) {
+      pendingAction = openOrganizer;
+      openAuth();
+      $("#auth-title").textContent = "Acceso de organizadores";
+      $("#auth-description").textContent =
+        "Entra con tu cuenta de organización para gestionar tus eventos. Las cuentas se habilitan con el administrador.";
+      $(".auth-switch").hidden = true;
+      return false;
+    }
+    if (session.usuario.rol !== "ORGANIZADOR") {
+      toast(
+        "Tu cuenta es de espectador. El administrador debe habilitar una cuenta de organizador para gestionar eventos.",
+      );
+      return false;
+    }
+    return true;
+  }
+  async function openOrganizer(view = "events", eventId = null) {
+    if (!organizerAllowed()) return;
+    showDialog("#organizer-dialog");
+    const content = $("#organizer-content");
+    content.innerHTML =
+      '<p class="org-loading" role="status">Preparando tu espacio…</p>';
+    all("[data-org-view]").forEach((b) =>
+      b.classList.toggle("active", b.dataset.orgView === view),
+    );
+    if (view === "sales") {
+      await openOrders();
+      return;
+    }
+    try {
+      [organizationEvents, organizationVenues] = await Promise.all([
+        api("eventos/mis-eventos/").then(list),
+        api("recintos/").then(list),
+      ]);
+      if (view === "venues") {
+        renderOrganizerVenues();
+        return;
+      }
+      if (view === "new-event" || view === "edit") {
+        renderOrganizerEventForm(eventId);
+        return;
+      }
+      const active = organizationEvents.filter((e) => e.activo).length;
+      content.innerHTML = `<div class="org-overview"><div><strong>${organizationEvents.length}</strong><span>Eventos en tu cuenta</span></div><div><strong>${active}</strong><span>En cartelera</span></div><button class="button lime" type="button" data-org-view="new-event">+ Crear evento</button></div><div class="org-event-list">${organizationEvents.length ? organizationEvents.map((event) => `<article class="org-event-card"><img src="${escape(imageURL(event.imagen_url) || fallbackImage)}" alt="${escape(event.artista)}" referrerpolicy="no-referrer"><div><span class="org-status ${event.activo ? "" : "paused"}">${event.activo ? "Publicado" : "Pausado"}</span><h3>${escape(event.nombre)}</h3><p>${escape(event.artista)} · ${date(event.fecha_hora, { day: "numeric", month: "long", year: "numeric" })}</p><p>${escape(organizationVenues.find((r) => r.id === event.recinto)?.nombre || "")} · ${event.sectores.length} sectores</p><div class="org-actions"><button type="button" data-org-edit="${event.id}">Editar evento</button><button type="button" data-org-sector="${event.id}">Añadir sector</button><button type="button" data-org-toggle="${event.id}" data-active="${event.activo ? "0" : "1"}">${event.activo ? "Pausar" : "Publicar"}</button>${event.activo ? `<button type="button" class="org-danger" data-org-delete="${event.id}">Retirar de cartelera</button>` : ""}</div></div></article>`).join("") : '<div class="org-empty"><h3>Tu primer show empieza aquí.</h3><p>Crea un recinto y registra tu evento con sus sectores, precios y asientos.</p></div>'}</div>`;
+    } catch (error) {
+      content.innerHTML = `<p class="error-box" role="alert">${escape(error.message)}</p><button type="button" class="button outline" data-org-view="events">Volver a intentar</button>`;
+    }
+  }
+  function renderOrganizerVenues() {
+    $("#organizer-content").innerHTML =
+      `<div class="org-columns"><section><span class="eyebrow muted">EL LUGAR DEL SHOW</span><h3>Registrar un recinto</h3><form id="org-venue-form" class="org-form"><label>Nombre<input name="nombre" required maxlength="150" placeholder="Nombre del recinto"></label><label>Ciudad<input name="ciudad" required maxlength="100" placeholder="Ej: Concepción"></label><label>Dirección<input name="direccion" required maxlength="250" placeholder="Calle y número"></label><p class="form-error" role="alert"></p><button type="submit" class="button lime">Guardar recinto</button></form></section><section><span class="eyebrow muted">RECINTOS DISPONIBLES</span><h3>Encuentra tu escenario</h3><div class="org-venues">${organizationVenues.map((r) => `<article><strong>${escape(r.nombre)}</strong><p>${escape(r.ciudad)} · ${escape(r.direccion)}</p></article>`).join("") || "<p>Todavía no hay recintos registrados.</p>"}</div></section></div>`;
+    $("#org-venue-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = e.currentTarget,
+        button = $('button[type="submit"]', form);
+      button.disabled = true;
+      try {
+        const body = Object.fromEntries(new FormData(form));
+        await api("recintos/", { method: "POST", body });
+        await openOrganizer("venues");
+        toast("Recinto registrado. Ya puedes usarlo en tus eventos.");
+      } catch (error) {
+        $(".form-error", form).textContent = error.message;
+        button.disabled = false;
+      }
+    });
+  }
+  function addSectorRow(values = {}) {
+    const key = ++sectorDraft;
+    $("#org-sector-rows").insertAdjacentHTML(
+      "beforeend",
+      `<div class="org-sector-row" data-sector-row><label>Sector<input name="sector_${key}" data-field="nombre" required maxlength="100" value="${escape(values.nombre || "")}" placeholder="Ej: VIP"></label><label>Precio CLP<input type="number" data-field="precio" required min="1" step="1" value="${values.precio || ""}" placeholder="35000"></label><label>Entradas<input type="number" data-field="stock" required min="1" max="5000" step="1" value="${values.stock || ""}" placeholder="100"></label><button type="button" class="org-remove-sector" data-org-remove-sector aria-label="Quitar sector">×</button></div>`,
+    );
+  }
+  function renderOrganizerEventForm(eventId) {
+    const event = organizationEvents.find((e) => e.id === Number(eventId));
+    if (!organizationVenues.length) {
+      $("#organizer-content").innerHTML =
+        '<div class="org-empty"><h3>Primero, el lugar.</h3><p>Registra un recinto antes de crear tu evento.</p><button type="button" class="button lime" data-org-view="venues">Registrar recinto</button></div>';
+      return;
+    }
+    const localDate = event
+      ? new Intl.DateTimeFormat("sv-SE", {
+          timeZone: "America/Santiago",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        })
+          .format(new Date(event.fecha_hora))
+          .replace(" ", "T")
+      : "";
+    const isPast = event && new Date(event.fecha_hora) <= new Date();
+    $("#organizer-content").innerHTML =
+      `<div class="org-form-heading"><h3>${event ? "Editar tu evento" : "Vamos a crear un gran show."}</h3><p>${event ? "Actualiza la información de tu concierto." : "Los asientos se generan automáticamente al guardar tus sectores."}</p></div><form id="org-event-form" class="org-form"><div class="org-fields"><label>Nombre del evento<input name="nombre" required maxlength="200" value="${escape(event?.nombre || "")}" placeholder="Nombre del show"></label><label>Artista o banda<input name="artista" required maxlength="150" value="${escape(event?.artista || "")}" placeholder="Quién sube al escenario"></label><label>Fecha y hora (Chile)<input type="datetime-local" name="fecha_hora" required value="${escape(localDate)}" ${isPast ? "disabled" : ""}></label><label>Recinto<select name="recinto" required>${organizationVenues.map((r) => `<option value="${r.id}" ${r.id === event?.recinto ? "selected" : ""}>${escape(r.nombre)} · ${escape(r.ciudad)}</option>`).join("")}</select></label><label>Categoría<select name="categoria">${categoryOptions.map(([code, label]) => `<option value="${code}" ${code === event?.categoria ? "selected" : ""}>${escape(label)}</option>`).join("")}</select></label><label>Imagen de portada (opcional)<input type="url" name="imagen_url" maxlength="1000" value="${escape(event?.imagen_url || "")}" placeholder="https://…"></label></div><label>Descripción<textarea name="descripcion" rows="3" maxlength="5000" placeholder="Cuéntanos cómo será esta experiencia">${escape(event?.descripcion || "")}</textarea></label>${event ? `<div class="org-current-sectors"><h4>Localidades actuales</h4>${event.sectores.map((s) => `<p>${escape(s.nombre)} · ${money(s.precio)} · ${s.stock} entradas disponibles</p>`).join("")}</div>` : '<section class="org-sector-section"><div class="org-section-heading"><h4>Sectores y localidades</h4><button type="button" class="text-link" data-org-add-sector>+ Añadir sector</button></div><div id="org-sector-rows"></div><small>Máximo 10 sectores. Hasta 5.000 sillas por sector.</small></section>'}<p class="form-error" role="alert"></p><div class="org-form-actions"><button type="submit" class="button lime">${event ? "Guardar cambios" : "Publicar evento"}</button><button type="button" class="button outline" data-org-view="events">Volver a mis eventos</button></div></form>`;
+    if (!event) {
+      addSectorRow({ nombre: "Cancha general", precio: 35000, stock: 100 });
+      addSectorRow({ nombre: "Tribuna", precio: 55000, stock: 80 });
+      addSectorRow({ nombre: "VIP", precio: 85000, stock: 40 });
+    }
+    $("#org-event-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = e.currentTarget,
+        button = $('button[type="submit"]', form);
+      button.disabled = true;
+      $(".form-error", form).textContent = "";
+      try {
+        const body = Object.fromEntries(new FormData(form));
+        body.recinto = Number(body.recinto);
+        // Enviar la zona de Santiago explícita: no depende de la zona del dispositivo.
+        if (body.fecha_hora) {
+          const instant = chileanDateToISO(body.fecha_hora);
+          if (new Date(instant) <= new Date())
+            throw new Error("Elige una fecha futura.");
+          body.fecha_hora = instant;
+        }
+        if (body.imagen_url && !body.imagen_url.startsWith("https://"))
+          throw new Error("La imagen de portada debe usar HTTPS.");
+        if (!event) {
+          body.sectores = all("[data-sector-row]", form).map((row) => ({
+            nombre: $('[data-field="nombre"]', row).value.trim(),
+            precio: $('[data-field="precio"]', row).value,
+            stock: Number($('[data-field="stock"]', row).value),
+          }));
+          if (!body.sectores.length)
+            throw new Error("Añade al menos un sector.");
+        }
+        Object.keys(body)
+          .filter((k) => k.startsWith("sector_"))
+          .forEach((k) => delete body[k]);
+        await api(event ? `eventos/${event.id}/` : "eventos/crear-completo/", {
+          method: event ? "PATCH" : "POST",
+          body,
+        });
+        await refreshCatalogue();
+        await openOrganizer();
+        toast(
+          event ? "Cambios guardados." : "Evento publicado con sus asientos.",
+        );
+      } catch (error) {
+        $(".form-error", form).textContent = error.message;
+        button.disabled = false;
+      }
+    });
+  }
+  function chileanDateToISO(value) {
+    const target = new Date(value + "Z");
+    let instant = new Date(target);
+    for (let i = 0; i < 3; i++) {
+      const parts = new Intl.DateTimeFormat("sv-SE", {
+        timeZone: "America/Santiago",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      }).format(instant);
+      const represented = new Date(parts.replace(" ", "T") + "Z");
+      instant = new Date(
+        instant.getTime() + target.getTime() - represented.getTime(),
+      );
+    }
+    const actual = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "America/Santiago",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+      .format(instant)
+      .replace(" ", "T");
+    if (actual !== value)
+      throw new Error(
+        "Esta hora no existe por el cambio de horario. Elige otra hora.",
+      );
+    return instant.toISOString();
+  }
+  async function refreshCatalogue() {
+    const [catalogue, venues] = await Promise.all([
+      api("eventos/", { authenticated: false }).then(list),
+      api("recintos/", { authenticated: false }).then(list),
+    ]);
+    const labels = new Map(categoryOptions);
+    events.splice(
+      0,
+      events.length,
+      ...catalogue
+        .filter((e) => e.activo && new Date(e.fecha_hora) > new Date())
+        .map((e) => ({
+          id: e.id,
+          nombre: e.nombre,
+          artista: e.artista,
+          descripcion: e.descripcion,
+          fecha: e.fecha_hora,
+          recinto: venues.find((r) => r.id === e.recinto)?.nombre || "",
+          ciudad: venues.find((r) => r.id === e.recinto)?.ciudad || "",
+          imagen: e.imagen_url,
+          demo: e.es_demo,
+          sectores: e.sectores,
+          categoria: labels.get(e.categoria),
+        })),
+    );
+    const current = $("#city-filter").value;
+    $("#city-filter").innerHTML =
+      '<option value="">Todas las ciudades</option>' +
+      [...new Set(events.map((e) => e.ciudad))]
+        .sort()
+        .map((c) => `<option value="${escape(c)}">${escape(c)}</option>`)
+        .join("");
+    $("#city-filter").value = [...$("#city-filter").options].some(
+      (o) => o.value === current,
+    )
+      ? current
+      : "";
+    renderEvents();
+  }
+  function renderAdditionalSector(id) {
+    const event = organizationEvents.find((e) => e.id === Number(id));
+    if (!event) return;
+    $("#organizer-content").innerHTML =
+      `<div class="org-form-heading"><h3>Añadir localidad</h3><p>${escape(event.nombre)}</p></div><form id="org-extra-sector" class="org-form"><div id="org-sector-rows"></div><p class="form-error" role="alert"></p><button type="submit" class="button lime">Guardar sector y generar asientos</button><button type="button" class="button outline" data-org-view="events">Volver</button></form>`;
+    addSectorRow();
+    $(".org-remove-sector").hidden = true;
+    $("#org-extra-sector").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const f = e.currentTarget,
+        b = $('button[type="submit"]', f);
+      b.disabled = true;
+      try {
+        await api("sectores/", {
+          method: "POST",
+          body: {
+            evento: event.id,
+            nombre: $('[data-field="nombre"]', f).value.trim(),
+            precio: $('[data-field="precio"]', f).value,
+            stock: Number($('[data-field="stock"]', f).value),
+          },
+        });
+        await refreshCatalogue();
+        await openOrganizer();
+        toast("Localidad lista para vender entradas.");
+      } catch (error) {
+        $(".form-error", f).textContent = error.message;
+        b.disabled = false;
+      }
+    });
+  }
+  $("#organizer-access").addEventListener("click", () => openOrganizer());
+  $("#my-events").addEventListener("click", () => openOrganizer());
+  $("#organizer-dialog").addEventListener("click", async (e) => {
+    const button = e.target.closest("button");
+    if (!button) return;
+    if (button.dataset.orgView) await openOrganizer(button.dataset.orgView);
+    if (button.dataset.orgEdit)
+      await openOrganizer("edit", button.dataset.orgEdit);
+    if (button.dataset.orgSector)
+      renderAdditionalSector(button.dataset.orgSector);
+    if (button.hasAttribute("data-org-add-sector")) {
+      if (all("[data-sector-row]").length < 10) addSectorRow();
+      else toast("Puedes registrar hasta 10 sectores.");
+    }
+    if (button.hasAttribute("data-org-remove-sector")) {
+      if (all("[data-sector-row]").length > 1)
+        button.closest("[data-sector-row]").remove();
+      else toast("El evento necesita al menos un sector.");
+    }
+    if (button.dataset.orgToggle || button.dataset.orgDelete) {
+      const id = button.dataset.orgToggle || button.dataset.orgDelete;
+      if (
+        button.dataset.orgDelete &&
+        !window.confirm(
+          "¿Retirar este evento de la cartelera? Las compras y entradas se conservarán.",
+        )
+      )
+        return;
+      button.disabled = true;
+      try {
+        await api(`eventos/${id}/`, {
+          method: button.dataset.orgDelete ? "DELETE" : "PATCH",
+          body: button.dataset.orgDelete
+            ? undefined
+            : { activo: button.dataset.active === "1" },
+        });
+        await refreshCatalogue();
+        await openOrganizer();
+        toast(
+          button.dataset.orgDelete
+            ? "Evento retirado de la cartelera."
+            : "Cartelera actualizada.",
+        );
+      } catch (error) {
+        toast(error.message);
+        button.disabled = false;
+      }
+    }
+  });
+
   $("#cart-button").addEventListener("click", openCart);
   $("#my-tickets").addEventListener("click", openTickets);
   $("#footer-tickets").addEventListener("click", openTickets);

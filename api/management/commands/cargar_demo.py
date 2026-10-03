@@ -20,9 +20,9 @@ class Command(BaseCommand):
                 username="organizador_demo", rol="ORGANIZADOR"
             )
         recinto, _ = Recinto.objects.get_or_create(
-            nombre="Arena Encore · Demo",
+            nombre="Arena Encore · Santiago",
             defaults={
-                "direccion": "Recinto ficticio para evaluación",
+                "direccion": "Acceso principal Arena Encore, Santiago",
                 "ciudad": "Santiago",
             },
         )

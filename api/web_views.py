@@ -67,3 +67,10 @@ def webpay_retorno(request):
     response["Cache-Control"] = "no-store"
     response["Referrer-Policy"] = "no-referrer"
     return response
+
+
+# Un enlace de página inexistente vuelve al inicio, también con DEBUG activo.
+# No procesa formularios ni declara que una operación desconocida tuvo éxito.
+@require_http_methods(["GET", "HEAD"])
+def pagina_no_encontrada(request):
+    return redirect("inicio")

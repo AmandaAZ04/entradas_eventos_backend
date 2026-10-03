@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
 from .models import Usuario, Recinto, Evento, Sector, Pago, Reembolso
+from .seating import generar_asientos
 
 
 # Permite administrar usuarios y asignar sus roles
@@ -53,6 +54,11 @@ class EventoAdmin(admin.ModelAdmin):
 class SectorAdmin(admin.ModelAdmin):
     list_display = ("nombre", "evento", "precio", "stock")
     list_filter = ("evento",)
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if not change:
+            generar_asientos(obj)
 
 
 # Auditoría sin cambiar estados, inventario ni tokens manualmente.

@@ -20,7 +20,7 @@ from .models import (
     Usuario,
 )
 from .validators import normalizar_rut, validar_nombre
-from .seating import validar_asientos
+from .seating import validar_asientos, generar_asientos
 
 
 # El registro público crea espectadores y valida los datos también sin navegador.
@@ -150,6 +150,8 @@ class RecintoSerializer(serializers.ModelSerializer):
 
 # Valida los sectores y evita asociarlos a eventos ajenos.
 class SectorSerializer(serializers.ModelSerializer):
+    stock = serializers.IntegerField(min_value=0, max_value=5000)
+
     class Meta:
         model = Sector
         fields = ["id", "evento", "nombre", "precio", "stock"]
@@ -207,6 +209,43 @@ class EventoSerializer(serializers.ModelSerializer):
                 "La imagen debe usar una dirección HTTPS."
             )
         return value
+
+
+# Alta completa: evento y localidades se guardan juntos o se revierten juntos.
+class SectorInicialSerializer(serializers.Serializer):
+    nombre = serializers.CharField(max_length=100)
+    precio = serializers.DecimalField(max_digits=10, decimal_places=2)
+    stock = serializers.IntegerField(min_value=1, max_value=5000)
+
+    def validate_precio(self, value):
+        if value <= 0 or value != value.to_integral_value():
+            raise serializers.ValidationError(
+                "Ingresa un precio positivo en pesos enteros."
+            )
+        return value
+
+
+class EventoCompletoSerializer(EventoSerializer):
+    sectores = SectorInicialSerializer(many=True, allow_empty=False)
+
+    def validate_sectores(self, value):
+        if len(value) > 10:
+            raise serializers.ValidationError("Máximo 10 sectores por evento.")
+        nombres = [s["nombre"].strip().casefold() for s in value]
+        if len(nombres) != len(set(nombres)):
+            raise serializers.ValidationError(
+                "Los nombres de los sectores no pueden repetirse."
+            )
+        return value
+
+    @transaction.atomic
+    def create(self, validated_data):
+        sectores = validated_data.pop("sectores")
+        evento = super().create(validated_data)
+        for datos in sectores:
+            sector = Sector.objects.create(evento=evento, **datos)
+            generar_asientos(sector)
+        return evento
 
 
 # Valida el sector y la cantidad solicitada.

@@ -577,6 +577,182 @@ class FlujoEntradasTests(TestCase):
         pago.refresh_from_db()
         self.assertEqual(pago.estado, "CANCELADO")
 
+    def datos_evento_panel(self):
+        return {
+            "nombre": "Show del panel",
+            "artista": "Banda del panel",
+            "fecha_hora": (timezone.now() + timedelta(days=45)).isoformat(),
+            "recinto": self.sector.evento.recinto_id,
+            "categoria": "POP",
+            "sectores": [
+                {"nombre": "Cancha general", "precio": 35000, "stock": 12},
+                {"nombre": "VIP", "precio": 85000, "stock": 5},
+            ],
+        }
+
+    def test_panel_alta_completa_y_compra_de_asiento_nuevo(self):
+        self.client.force_authenticate(self.organizador)
+        respuesta = self.client.post(
+            "/api/eventos/crear-completo/", self.datos_evento_panel(), format="json"
+        )
+        self.assertEqual(respuesta.status_code, 201, respuesta.data)
+        evento = Evento.objects.get(pk=respuesta.data["id"])
+        self.assertEqual(evento.organizador_id, self.organizador.pk)
+        self.assertEqual(evento.sectores.count(), 2)
+        sector = evento.sectores.get(nombre="Cancha general")
+        self.assertEqual(sector.asientos.count(), 12)
+        self.assertEqual(sector.asientos.last().etiqueta, "B-02")
+        self.client.force_authenticate(self.espectador)
+        silla = sector.asientos.first()
+        respuesta = self.client.post(
+            "/api/carro-tickets/",
+            {"sector": sector.pk, "cantidad": 1, "asientos": [silla.pk]},
+            format="json",
+        )
+        self.assertEqual(respuesta.status_code, 201)
+        respuesta = self.client.post("/api/compras/pagar/")
+        self.assertEqual(respuesta.status_code, 201)
+        pago = Pago.objects.get(pk=respuesta.data["id"])
+        self.autorizar(pago)
+        confirmar_pago(pago.token)
+        self.assertEqual(Entrada.objects.get().asiento_id, silla.pk)
+        sector.refresh_from_db()
+        self.assertEqual(sector.stock, 11)
+
+    def test_panel_alta_invalida_no_deja_evento_ni_sillas(self):
+        self.client.force_authenticate(self.organizador)
+        datos = self.datos_evento_panel()
+        datos["sectores"][1]["precio"] = -1
+        self.assertEqual(
+            self.client.post(
+                "/api/eventos/crear-completo/", datos, format="json"
+            ).status_code,
+            400,
+        )
+        self.assertFalse(Evento.objects.filter(nombre=datos["nombre"]).exists())
+        self.assertFalse(Asiento.objects.exists())
+        datos["sectores"][1].update(nombre="cancha GENERAL", precio=85000)
+        self.assertEqual(
+            self.client.post(
+                "/api/eventos/crear-completo/", datos, format="json"
+            ).status_code,
+            400,
+        )
+        self.assertFalse(Evento.objects.filter(nombre=datos["nombre"]).exists())
+
+    def test_panel_espectador_y_anonimo_no_acceden_ni_publican(self):
+        for usuario in [None, self.espectador]:
+            self.client.force_authenticate(usuario)
+            self.assertIn(
+                self.client.get("/api/eventos/mis-eventos/").status_code, [401, 403]
+            )
+            self.assertIn(
+                self.client.post(
+                    "/api/eventos/crear-completo/",
+                    self.datos_evento_panel(),
+                    format="json",
+                ).status_code,
+                [401, 403],
+            )
+
+    def test_panel_mis_eventos_solo_propios_y_actualizacion_protegida(self):
+        self.client.force_authenticate(self.otro_organizador)
+        respuesta = self.client.post(
+            "/api/eventos/crear-completo/", self.datos_evento_panel(), format="json"
+        )
+        nuevo = respuesta.data["id"]
+        respuesta = self.client.get("/api/eventos/mis-eventos/")
+        self.assertEqual([e["id"] for e in respuesta.data], [nuevo])
+        self.assertEqual(
+            self.client.patch(
+                f"/api/eventos/{self.sector.evento_id}/",
+                {"nombre": "Ajeno"},
+                format="json",
+            ).status_code,
+            403,
+        )
+        self.client.force_authenticate(self.organizador)
+        self.assertEqual(self.client.delete(f"/api/eventos/{nuevo}/").status_code, 403)
+        self.assertEqual(
+            self.client.patch(
+                f"/api/eventos/{self.sector.evento_id}/",
+                {"nombre": "Nombre actualizado"},
+                format="json",
+            ).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.delete(f"/api/eventos/{self.sector.evento_id}/").status_code,
+            204,
+        )
+        self.sector.evento.refresh_from_db()
+        self.assertFalse(self.sector.evento.activo)
+        self.assertEqual(
+            self.client.get(f"/api/eventos/{self.sector.evento_id}/").status_code, 200
+        )
+        self.client.force_authenticate(None)
+        self.assertEqual(
+            self.client.get(f"/api/eventos/{self.sector.evento_id}/").status_code, 404
+        )
+
+    def test_panel_recinto_y_sector_generan_asientos_con_permisos(self):
+        self.client.force_authenticate(self.espectador)
+        self.assertEqual(
+            self.client.post(
+                "/api/recintos/",
+                {"nombre": "Nuevo", "ciudad": "Temuco", "direccion": "Calle 10"},
+                format="json",
+            ).status_code,
+            403,
+        )
+        self.client.force_authenticate(self.organizador)
+        self.assertEqual(
+            self.client.post(
+                "/api/recintos/",
+                {"nombre": "Nuevo", "ciudad": "Temuco", "direccion": "Calle 10"},
+                format="json",
+            ).status_code,
+            201,
+        )
+        datos = {
+            "evento": self.sector.evento_id,
+            "nombre": "Nueva localidad",
+            "precio": 40000,
+            "stock": 21,
+        }
+        respuesta = self.client.post("/api/sectores/", datos, format="json")
+        self.assertEqual(respuesta.status_code, 201)
+        self.assertEqual(
+            Asiento.objects.filter(sector_id=respuesta.data["id"]).count(), 21
+        )
+        self.client.force_authenticate(self.otro_organizador)
+        datos["nombre"] = "Localidad ajena"
+        self.assertEqual(
+            self.client.post("/api/sectores/", datos, format="json").status_code, 400
+        )
+
+    def test_paginas_inexistentes_vuelven_al_inicio_con_y_sin_debug(self):
+        for debug in [True, False]:
+            with self.subTest(debug=debug), override_settings(DEBUG=debug):
+                for ruta in ["/seccion/", "/seccion", "/otra/pagina/?dato=ejemplo"]:
+                    self.assertRedirects(self.client.get(ruta), "/", status_code=302)
+                self.assertEqual(self.client.head("/seccion/").status_code, 302)
+                self.assertEqual(self.client.post("/seccion/", {}).status_code, 405)
+
+    def test_redireccion_no_oculta_errores_api_ni_interfiere_rutas_reales(self):
+        for ruta in [
+            "/api/ruta-inexistente/",
+            "/api/eventos/9999999/",
+            "/static/archivo-inexistente.css",
+            "/media/no-existe.jpg",
+        ]:
+            respuesta = self.client.get(ruta)
+            self.assertEqual(respuesta.status_code, 404)
+            self.assertNotIn("Location", respuesta.headers)
+        self.assertEqual(self.client.get("/api/eventos/").status_code, 200)
+        self.assertEqual(self.client.get("/api/docs/").status_code, 200)
+        self.assertEqual(self.client.get("/").status_code, 200)
+
     def test_schema_y_footer(self):
         self.assertEqual(self.client.get("/api/docs/").status_code, 200)
         respuesta = self.client.get(

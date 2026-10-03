@@ -270,7 +270,7 @@ Ejecutar:
 .\env\Scripts\python.exe manage.py test api --verbosity 2
 ```
 
-Las 42 pruebas verifican JWT/refresh/roles, permisos, persistencia desde otro cliente, privacidad, filtros, precios históricos, múltiples eventos, validaciones de registro, Webpay aprobado/rechazado/cancelado/incierto, emisión única, reembolso y entrega. Una prueba usa conexiones PostgreSQL concurrentes para disputar el último ticket y repetir simultáneamente la confirmación.
+Las 52 pruebas verifican JWT/refresh/roles, permisos, persistencia desde otro cliente, privacidad, filtros, precios históricos, múltiples eventos, validaciones de registro, Webpay aprobado/rechazado/cancelado/incierto, emisión única, reembolso y entrega. Una prueba usa conexiones PostgreSQL concurrentes para disputar el último ticket y repetir simultáneamente la confirmación.
 
 Django utiliza una base de datos de pruebas separada. El usuario de PostgreSQL debe tener permiso para crearla.
 
@@ -316,3 +316,25 @@ Cada concierto dispone de un plano común con Cancha, Tribuna y VIP. Las sillas 
 La cartelera incluye Santiago, Viña del Mar, Concepción, Valparaíso, Antofagasta, La Serena y Temuco. Para preparar los asientos y ciudades de la cartelera incluida, ejecuta `python manage.py configurar_recintos`. Repetir el comando conserva los IDs y el stock.
 
 El retorno de Webpay redirige al inicio con un mensaje basado en el resultado verificado por el servidor. La autorización bancaria y las pantallas del proveedor pertenecen a Transbank; activar cobros comerciales requiere credenciales de producción.
+
+
+## Panel de organizadores
+
+La cabecera de Encore incluye **Organizadores**. Una cuenta con rol `ORGANIZADOR` accede a Mis eventos, Crear evento, Recintos y Mis ventas. Una cuenta de espectador accede al carro, sus compras y entradas. El login JWT es común, pero los permisos y la interfaz dependen del rol. El registro público siempre crea espectadores.
+
+Los organizadores registran recintos y publican eventos con nombre, artista, fecha/hora de Chile, categoría, portada y descripción. Cada evento se guarda junto a sus sectores, precios y stock en una sola transacción. Se generan las sillas automáticamente para sectores nuevos, también al crearlos individualmente desde la API o la administración. El panel permite editar, pausar, volver a publicar y retirar eventos conservando las compras. Desde Mis ventas pueden cancelar compras o marcar el ingreso.
+
+La cuenta `organizador_demo` creada por la carga inicial no incluye contraseña pública. Si es la cuenta que administra tu cartelera, habilita su acceso ejecutando en la carpeta del proyecto:
+
+```powershell
+python manage.py changepassword organizador_demo
+```
+
+Escribe una contraseña propia cuando se solicite; no la publiques en GitHub. Después pulsa **Organizadores** e inicia sesión con `organizador_demo` y esa contraseña. Para otras cuentas, el administrador asigna el rol ORGANIZADOR desde `/admin/` (Usuarios → cuenta → Rol del sistema). Una cuenta organizadora no necesita permisos staff para usar este panel.
+
+Rutas de gestión adicionales: GET `/api/eventos/mis-eventos/` y POST `/api/eventos/crear-completo/`. Ambas exigen rol Organizador; el organizador se asigna desde el usuario autenticado. El segundo endpoint exige entre 1 y 10 sectores con nombres distintos, precio CLP entero positivo y stock de 1 a 5.000 por sector. No se permite crear ni modificar eventos ajenos.
+
+
+## Navegación a páginas inexistentes
+
+Un enlace desconocido de página, como `/seccion/`, redirige temporalmente al inicio (`302` → `/`). La ruta de recuperación está al final de `urlpatterns` y funciona con DEBUG activado o desactivado. Las solicitudes GET y HEAD se recuperan; los formularios enviados a páginas inexistentes no se procesan. API, administración y archivos conservan sus respuestas de error para no ocultar problemas.
