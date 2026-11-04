@@ -2,6 +2,14 @@
 
 Proyecto de evaluación de Desarrollo Backend desarrollado con Django REST Framework y PostgreSQL.
 
+## Despliegue en AWS EC2
+
+La [guía de despliegue](deploy/ec2/README.md) adapta la receta de clase a este
+proyecto con Ubuntu 24.04, PostgreSQL, Gunicorn, systemd y Nginx. Incluye
+configuración de estáticos, variables privadas, HTTPS y diagnóstico. Los archivos
+del repositorio preparan el servidor; es necesario crear y configurar la instancia
+EC2 para publicar la aplicación.
+
 - **Estudiante:** Amanda Angélica Álvarez Álvarez
 - **Sección:** IEC-N4-C1
 - **Año:** 2026
