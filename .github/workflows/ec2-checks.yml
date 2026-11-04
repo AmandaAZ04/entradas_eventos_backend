@@ -1,0 +1,66 @@
+name: Comprobar despliegue EC2
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  linux-postgresql-nginx:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: entradas_test
+          POSTGRES_USER: entradas_test
+          POSTGRES_PASSWORD: solo-ci-no-produccion
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DJANGO_SECRET_KEY: clave-exclusiva-de-pruebas-no-usar-en-produccion-ec2
+      DJANGO_DEBUG: 'False'
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,testserver
+      DJANGO_CSRF_TRUSTED_ORIGINS: http://localhost:8080
+      DJANGO_STATIC_ROOT: ${{ github.workspace }}/staticfiles
+      DB_NAME: entradas_test
+      DB_USER: entradas_test
+      DB_PASSWORD: solo-ci-no-produccion
+      DB_HOST: 127.0.0.1
+      DB_PORT: '5432'
+      WEBPAY_ENVIRONMENT: integration
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-deploy.txt
+      - name: Instalar dependencias y Nginx
+        run: |
+          python -m pip install -r requirements-deploy.txt
+          sudo apt-get update
+          sudo apt-get install -y nginx
+      - name: Validar scripts y Django
+        run: |
+          bash -n deploy/ec2/manage.sh deploy/ec2/verificar.sh deploy/ec2/probar_proxy_ci.sh
+          python manage.py check
+          python manage.py makemigrations --check --dry-run
+      - name: Probar API con PostgreSQL
+        run: python manage.py test api --verbosity 2
+      - name: Migrar y recopilar estáticos
+        run: |
+          python manage.py migrate --noinput
+          python manage.py collectstatic --noinput
+      - name: Probar Gunicorn y Nginx con HTTP real
+        run: bash deploy/ec2/probar_proxy_ci.sh

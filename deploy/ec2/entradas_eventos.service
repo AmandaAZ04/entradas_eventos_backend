@@ -1,0 +1,28 @@
+[Unit]
+Description=Encore - Django REST Framework con Gunicorn
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=entradas
+Group=www-data
+SupplementaryGroups=entradas
+WorkingDirectory=/srv/entradas_eventos
+EnvironmentFile=/etc/entradas_eventos/entradas.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+RuntimeDirectory=entradas_eventos
+RuntimeDirectoryMode=0750
+UMask=0007
+ExecStart=/srv/entradas_eventos/venv/bin/gunicorn --workers 2 --bind unix:/run/entradas_eventos/gunicorn.sock --umask 007 --timeout 90 --access-logfile - --error-logfile - --capture-output entradas_eventos.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
