@@ -53,7 +53,7 @@ jobs:
           sudo apt-get install -y nginx
       - name: Validar scripts y Django
         run: |
-          bash -n deploy/ec2/manage.sh deploy/ec2/verificar.sh deploy/ec2/probar_proxy_ci.sh
+          for script in deploy/ec2/*.sh; do bash -n "$script"; done
           python manage.py check
           python manage.py makemigrations --check --dry-run
       - name: Probar API con PostgreSQL
